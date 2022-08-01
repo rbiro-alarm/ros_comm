@@ -158,6 +158,26 @@ ROSCPP_DECL void waitForShutdown();
  * \return true if we're still OK, false if it's time to exit
  */
 ROSCPP_DECL bool ok();
+
+/** \brief get a call when ok changes state.
+ *
+ * Register a function to be called when the state of ok() changes.
+ *
+ * \param f The function to be called
+ *
+ * \return a handle to be used to deregister the callback later.
+ */
+ROSCPP_DECL int registerOkCallback(boost::function<void(bool, bool)> f);
+
+/** \brief remove a ok change callback
+ *
+ * Remove a perviously registered function that was to 
+ * be called when the state of ok() changes.
+ *
+ * \param handle the value returned by a previous call to registerOkCallback
+ */
+ROSCPP_DECL void removeOkCallback(int handle);
+
 /**
  * \brief Disconnects everything and unregisters from the master.  It is generally not
  * necessary to call this function, as the node will automatically shutdown when all

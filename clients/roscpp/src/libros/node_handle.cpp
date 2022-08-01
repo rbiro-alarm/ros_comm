@@ -78,6 +78,7 @@ NodeHandle::NodeHandle(const std::string& ns, const M_string& remappings)
   : namespace_(this_node::getNamespace())
   , callback_queue_(0)
   , collection_(0)
+  , ok_callback_handle_(-1)
 {
   std::string tilde_resolved_ns;
   if (!ns.empty() && ns[0] == '~')// starts with tilde
@@ -169,7 +170,11 @@ void NodeHandle::construct(const std::string& ns, bool validate_name)
       // FIXME validate namespace_ now
     }
   ok_ = true;
+  
+  typedef void (NodeHandle::*mf_type)(bool, bool);
 
+  ok_callback_handle_ = ros::registerOkCallback(boost::bind(static_cast<mf_type>(&NodeHandle::shutdownCallback),
+							    this, _1, _2));
   boost::mutex::scoped_lock lock(g_nh_refcount_mutex);
 
   if (g_nh_refcount == 0 && !ros::isStarted())
@@ -184,6 +189,12 @@ void NodeHandle::construct(const std::string& ns, bool validate_name)
 void NodeHandle::destruct()
 {
   delete collection_;
+
+  if (ok_callback_handle_ != -1)
+  {
+    ros::removeOkCallback(ok_callback_handle_);
+    ok_callback_handle_ = -1;
+  }
 
   boost::mutex::scoped_lock lock(g_nh_refcount_mutex);
 
@@ -488,6 +499,7 @@ SteadyTimer NodeHandle::createSteadyTimer(SteadyTimerOptions& ops) const
 
 void NodeHandle::shutdown()
 {
+  //ros::removeOkCallback(boost::bind(NodeHandle::shutdownCallback(this, _1, _2)))
   {
     NodeHandleBackingCollection::V_SubImpl::iterator it = collection_->subs_.begin();
     NodeHandleBackingCollection::V_SubImpl::iterator end = collection_->subs_.end();
@@ -798,6 +810,24 @@ bool NodeHandle::searchParam(const std::string& key, std::string& result_out) co
 bool NodeHandle::ok() const
 {
   return ros::ok() && ok_;
+}
+
+int NodeHandle::registerShutdownCallback(boost::function<void(bool, bool)> f)
+{
+  return ok_.registerCallback(f);
+}
+
+void NodeHandle::removeShutdownCallback(int handle)
+{
+  ok_.deregisterCallback(handle);
+}
+
+void NodeHandle::shutdownCallback(bool ov, bool nv)
+{
+  if (ov != nv && !nv)
+  {
+    ok_ = false;
+  }
 }
 
 } // namespace ros

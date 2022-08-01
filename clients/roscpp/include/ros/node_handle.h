@@ -47,6 +47,8 @@
 #include "ros/init.h"
 #include "common.h"
 
+#include "ros/adc_condition.h"
+
 #include <boost/bind.hpp>
 
 #include <xmlrpcpp/XmlRpcValue.h>
@@ -2174,6 +2176,35 @@ if (service)  // Enter if advertised service is valid
    */
   bool ok() const;
 
+   /** \brief get ADCCondition version of ok.
+   *
+   * \return ADCCondition<bool> ok
+   */
+ ADCCondition<bool> &getOKCondition() {
+     return ok_;
+ }
+
+  /** \brief register shutdown callback
+   *
+   * This method registers a callback for when ok changes.
+   *
+   * \param param_name The function to be called void(bool old, bool new)
+   *
+   * \return a handle for later callback to deregister
+   *
+   */
+  int registerShutdownCallback(boost::function<void(bool, bool)> f);
+
+  /** \brief remove shutdown callback
+   *
+   * This method removes a previously registered callcack for shutdown
+   *
+   * \param param_name The handle returned by a previous call to
+   * registerShutdown Callback
+   *
+   */
+  void removeShutdownCallback(int h);
+
 private:
   struct no_validate { };
   // this is pretty awful, but required to preserve public interface (and make minimum possible changes)
@@ -2181,6 +2212,8 @@ private:
 
   void construct(const std::string& ns, bool validate_name);
   void destruct();
+
+  void shutdownCallback(bool ov, bool nv);
 
   void initRemappings(const M_string& remappings);
 
@@ -2195,7 +2228,8 @@ private:
 
   NodeHandleBackingCollection* collection_;
 
-  bool ok_;
+  ADCCondition<bool> ok_;
+  int ok_callback_handle_;
 };
 
 }

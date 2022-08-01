@@ -128,6 +128,10 @@ public:
    */
   void disable();
   /**
+   * \brief Wake up all the sleepers on the queue
+   */
+  void wake();
+  /**
    * \brief Returns whether or not this queue is enabled
    */
   bool isEnabled();

@@ -66,6 +66,12 @@ void CallbackQueue::disable()
   condition_.notify_all();
 }
 
+void CallbackQueue::wake()
+{
+  boost::mutex::scoped_lock lock(mutex_);
+  condition_.notify_all();
+}
+
 void CallbackQueue::clear()
 {
   boost::mutex::scoped_lock lock(mutex_);

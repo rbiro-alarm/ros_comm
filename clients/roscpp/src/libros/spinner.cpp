@@ -168,6 +168,7 @@ public:
 
 private:
   void threadFunc();
+  void wake(bool ov, bool nv);
 
   boost::mutex mutex_;
   boost::thread_group threads_;
@@ -175,7 +176,8 @@ private:
   uint32_t thread_count_;
   CallbackQueue* callback_queue_;
 
-  volatile bool continue_;
+  ADCCondition<volatile bool> continue_;
+  int continue_callback_handle_;
 
   ros::NodeHandle nh_;
 };
@@ -184,6 +186,7 @@ AsyncSpinnerImpl::AsyncSpinnerImpl(uint32_t thread_count, CallbackQueue* queue)
 : thread_count_(thread_count)
 , callback_queue_(queue)
 , continue_(false)
+, continue_callback_handle_(-1)
 {
   if (thread_count == 0)
   {
@@ -233,6 +236,11 @@ void AsyncSpinnerImpl::start()
   }
 }
 
+void AsyncSpinnerImpl::wake(volatile bool ov, volatile bool nv)
+{
+  callback_queue_->wake();
+}
+
 void AsyncSpinnerImpl::stop()
 {
   boost::mutex::scoped_lock lock(mutex_);
@@ -242,6 +250,11 @@ void AsyncSpinnerImpl::stop()
   continue_ = false;
   threads_.join_all();
 
+  if (continue_callback_handle_ != -1)
+  {
+    continue_.deregisterCallback(continue_callback_handle_);
+  }
+  
   spinner_monitor.remove(callback_queue_);
 }
 
@@ -251,7 +264,9 @@ void AsyncSpinnerImpl::threadFunc()
 
   CallbackQueue* queue = callback_queue_;
   bool use_call_available = thread_count_ == 1;
-  WallDuration timeout(0.1);
+  WallDuration timeout(1800);
+  continue_.addParent(nh_.getOKCondition());
+  continue_callback_handle_ = continue_.registerCallback(boost::bind(&AsyncSpinnerImpl::wake, this, _1, _2));
 
   while (continue_ && nh_.ok())
   {
@@ -264,6 +279,8 @@ void AsyncSpinnerImpl::threadFunc()
       queue->callOne(timeout);
     }
   }
+
+
 }
 
 AsyncSpinner::AsyncSpinner(uint32_t thread_count)
